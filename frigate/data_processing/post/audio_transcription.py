@@ -55,7 +55,7 @@ class AudioTranscriptionPostProcessor(PostProcessorApi):
             from faster_whisper import WhisperModel
 
             self.recognizer = WhisperModel(
-                model_size_or_path="small",
+                model_size_or_path="medium",
                 device="cuda"
                 if self.config.audio_transcription.device == "GPU"
                 else "cpu",
@@ -157,6 +157,8 @@ class AudioTranscriptionPostProcessor(PostProcessorApi):
                 temp_wav,
                 language=self.config.audio_transcription.language,
                 beam_size=5,
+                vad_filter=False,
+                no_speech_threshold=None,
             )
 
             os.remove(temp_wav)
