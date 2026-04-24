@@ -82,6 +82,8 @@ def get_audio_from_recording(
             "-i",
             file_path,
             "-vn",  # No video
+            "-af",
+            "afftdn=nf=-25,loudnorm=I=-16:LRA=11:TP=-1.5",
             "-acodec",
             "pcm_s16le",  # 16-bit PCM encoding
             "-ar",
