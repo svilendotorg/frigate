@@ -1,0 +1,14 @@
+[Unit]
+Description=Frigate auto-transcribe speech events
+After=network.target frigate.service
+Requires=frigate.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/frigate.env
+ExecStart=/usr/bin/python3 /opt/frigate-auto-transcribe.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
