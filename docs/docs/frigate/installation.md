@@ -3,6 +3,8 @@ id: installation
 title: Installation
 ---
 
+import ShmCalculator from '@site/src/components/ShmCalculator'
+
 Frigate is a Docker container that can be run on any Docker host including as a [Home Assistant App](https://www.home-assistant.io/apps/). Note that the Home Assistant App is **not** the same thing as the integration. The [integration](/integrations/home-assistant) is required to integrate Frigate into Home Assistant, whether you are running Frigate as a standalone Docker container or as a Home Assistant App.
 
 :::tip
@@ -77,20 +79,7 @@ The default shm size of **128MB** is fine for setups with **2 cameras** detectin
 
 The Frigate container also stores logs in shm, which can take up to **40MB**, so make sure to take this into account in your math as well.
 
-You can calculate the **minimum** shm size for each camera with the following formula using the resolution specified for detect:
-
-```console
-# Template for one camera without logs, replace <width> and <height>
-$ python -c 'print("{:.2f}MB".format((<width> * <height> * 1.5 * 20 + 270480) / 1048576))'
-
-# Example for 1280x720, including logs
-$ python -c 'print("{:.2f}MB".format((1280 * 720 * 1.5 * 20 + 270480) / 1048576 + 40))'
-66.63MB
-
-# Example for eight cameras detecting at 1280x720, including logs
-$ python -c 'print("{:.2f}MB".format(((1280 * 720 * 1.5 * 20 + 270480) / 1048576) * 8 + 40))'
-253MB
-```
+<ShmCalculator/>
 
 The shm size cannot be set per container for Home Assistant Apps. However, this is probably not required since by default Home Assistant Supervisor allocates `/dev/shm` with half the size of your total memory. If your machine has 8GB of memory, chances are that Frigate will have access to up to 4GB without any additional configuration.
 
@@ -282,7 +271,7 @@ If you are using `docker run`, add this option to your command `--device /dev/ha
 
 #### Configuration
 
-Finally, configure [hardware object detection](/configuration/object_detectors#hailo-8l) to complete the setup.
+Finally, configure [hardware object detection](/configuration/object_detectors#hailo-8) to complete the setup.
 
 ### MemryX MX3
 
@@ -439,6 +428,42 @@ or add these options to your `docker run` command:
 
 Next, you should configure [hardware object detection](/configuration/object_detectors#synaptics) and [hardware video processing](/configuration/hardware_acceleration_video#synaptics).
 
+### AXERA
+
+AXERA accelerators are available in an M.2 form factor, compatible with both Raspberry Pi and Orange Pi. This form factor has also been successfully tested on x86 platforms, making it a versatile choice for various computing environments.
+
+#### Installation
+
+Using AXERA accelerators requires the installation of the AXCL driver. We provide a convenient Linux script to complete this installation.
+
+Follow these steps for installation:
+
+1. Copy or download [this script](https://github.com/ivanshi1108/assets/releases/download/v0.16.2/user_installation.sh).
+2. Ensure it has execution permissions with `sudo chmod +x user_installation.sh`
+3. Run the script with `./user_installation.sh`
+
+#### Setup
+
+To set up Frigate, follow the default installation instructions, for example: `ghcr.io/blakeblackshear/frigate:stable`
+
+Next, grant Docker permissions to access your hardware by adding the following lines to your `docker-compose.yml` file:
+
+```yaml
+devices:
+  - /dev/axcl_host
+  - /dev/ax_mmb_dev
+  - /dev/msg_userdev
+volumes:
+  - /usr/bin/axcl:/usr/bin/axcl
+  - /usr/lib/axcl:/usr/lib/axcl
+```
+
+If you are using `docker run`, add this option to your command `--device /dev/axcl_host --device /dev/ax_mmb_dev --device /dev/msg_userdev`
+
+#### Configuration
+
+Finally, configure [hardware object detection](/configuration/object_detectors#axera) to complete the setup.
+
 ## Docker
 
 Running through Docker with Docker Compose is the recommended install method.
@@ -457,7 +482,8 @@ services:
       - /dev/apex_0:/dev/apex_0 # Passes a PCIe Coral, follow driver instructions here https://github.com/jnicolson/gasket-builder
       - /dev/video11:/dev/video11 # For Raspberry Pi 4B
       - /dev/dri/renderD128:/dev/dri/renderD128 # AMD / Intel GPU, needs to be updated for your hardware
-      - /dev/accel:/dev/accel # Intel NPU
+      - /dev/kfd:/dev/kfd # AMD Kernel Fusion Driver for ROCm
+      - /dev/accel:/dev/accel # AMD / Intel NPU
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /path/to/your/config:/config

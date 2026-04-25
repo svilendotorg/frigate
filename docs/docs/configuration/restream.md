@@ -3,11 +3,15 @@ id: restream
 title: Restream
 ---
 
+import ConfigTabs from "@site/src/components/ConfigTabs";
+import TabItem from "@theme/TabItem";
+import NavPath from "@site/src/components/NavPath";
+
 ## RTSP
 
 Frigate can restream your video feed as an RTSP feed for other applications such as Home Assistant to utilize it at `rtsp://<frigate_host>:8554/<camera_name>`. Port 8554 must be open. [This allows you to use a video feed for detection in Frigate and Home Assistant live view at the same time without having to make two separate connections to the camera](#reduce-connections-to-camera). The video feed is copied from the original video feed directly to avoid re-encoding. This feed does not include any annotation by Frigate.
 
-Frigate uses [go2rtc](https://github.com/AlexxIT/go2rtc/tree/v1.9.10) to provide its restream and MSE/WebRTC capabilities. The go2rtc config is hosted at the `go2rtc` in the config, see [go2rtc docs](https://github.com/AlexxIT/go2rtc/tree/v1.9.10#configuration) for more advanced configurations and features.
+Frigate uses [go2rtc](https://github.com/AlexxIT/go2rtc/tree/v1.9.13) to provide its restream and MSE/WebRTC capabilities. The go2rtc config is hosted at the `go2rtc` in the config, see [go2rtc docs](https://github.com/AlexxIT/go2rtc/tree/v1.9.13#configuration) for more advanced configurations and features.
 
 :::note
 
@@ -52,6 +56,16 @@ Some cameras only support one active connection or you may just want to have a s
 
 One connection is made to the camera. One for the restream, `detect` and `record` connect to the restream.
 
+Configure the go2rtc stream and point the camera inputs at the local restream.
+
+<ConfigTabs>
+<TabItem value="ui">
+
+Navigate to <NavPath path="Settings > System > go2rtc streams" /> and add stream entries for each camera. Then navigate to <NavPath path="Settings > Camera configuration > FFmpeg" /> for each camera and set the input paths to use the local restream URL (`rtsp://127.0.0.1:8554/<camera_name>`).
+
+</TabItem>
+<TabItem value="yaml">
+
 ```yaml
 go2rtc:
   streams:
@@ -87,9 +101,20 @@ cameras:
             - audio # <- only necessary if audio detection is enabled
 ```
 
+</TabItem>
+</ConfigTabs>
+
 ### With Sub Stream
 
 Two connections are made to the camera. One for the sub stream, one for the restream, `record` connects to the restream.
+
+<ConfigTabs>
+<TabItem value="ui">
+
+Navigate to <NavPath path="Settings > System > go2rtc streams" /> and add stream entries for each camera and its sub stream. Then navigate to <NavPath path="Settings > Camera configuration > FFmpeg" /> for each camera and configure separate inputs for the main and sub streams using the local restream URLs.
+
+</TabItem>
+<TabItem value="yaml">
 
 ```yaml
 go2rtc:
@@ -137,6 +162,9 @@ cameras:
             - audio # <- only necessary if audio detection is enabled
             - detect
 ```
+
+</TabItem>
+</ConfigTabs>
 
 ## Handling Complex Passwords
 
@@ -208,7 +236,7 @@ Enabling arbitrary exec sources allows execution of arbitrary commands through g
 
 ## Advanced Restream Configurations
 
-The [exec](https://github.com/AlexxIT/go2rtc/tree/v1.9.10#source-exec) source in go2rtc can be used for custom ffmpeg commands. An example is below:
+The [exec](https://github.com/AlexxIT/go2rtc/tree/v1.9.13#source-exec) source in go2rtc can be used for custom ffmpeg commands. An example is below:
 
 :::warning
 
