@@ -1,55 +1,86 @@
 #!/usr/bin/env python3
-"""Auto-transcribe Frigate speech events via MQTT."""
-import json
+"""Auto-transcribe Frigate speech events by polling the API."""
 import logging
 import os
-import requests
-import paho.mqtt.client as mqtt
+import time
 
-MQTT_HOST = os.environ.get("FRIGATE_MQTT_HOST", "")
-MQTT_PORT = int(os.environ.get("FRIGATE_MQTT_PORT", "1883"))
-MQTT_USER = os.environ.get("FRIGATE_MQTT_USER", "")
-MQTT_PASS = os.environ.get("FRIGATE_MQTT_PASSWORD", "")
+import requests
+
 FRIGATE_API = os.environ.get("FRIGATE_API_URL", "http://127.0.0.1:5000")
+POLL_INTERVAL = 30  # seconds between polls
+TRANSCRIBE_TIMEOUT = 90  # seconds to wait for transcription to complete
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("auto-transcribe")
 
 
-def on_connect(client, userdata, flags, rc, props=None):
-    log.info("Connected to MQTT, subscribing to frigate/events")
-    client.subscribe("frigate/events")
-
-
-def on_message(client, userdata, msg):
+def get_untranscribed_events(after: float) -> list[dict]:
+    """Fetch speech events without descriptions since given timestamp."""
     try:
-        payload = json.loads(msg.payload)
-    except Exception:
-        return
+        r = requests.get(
+            f"{FRIGATE_API}/api/events",
+            params={"label": "speech", "limit": 100, "after": after},
+            timeout=10,
+        )
+        r.raise_for_status()
+        events = r.json()
+        return [e for e in events if not e.get("data", {}).get("description")]
+    except Exception as e:
+        log.error(f"Failed to fetch events: {e}")
+        return []
 
-    event_type = payload.get("type")
-    after = payload.get("after", {})
-    label = after.get("label", "")
-    event_id = after.get("id", "")
 
-    if label != "speech" or event_type != "end" or not event_id:
-        return
-
-    log.info(f"Speech event ended: {event_id} — triggering transcription")
+def transcribe_event(event_id: str) -> bool:
+    """Trigger transcription and wait for result. Returns True on success."""
     try:
         r = requests.put(
             f"{FRIGATE_API}/api/audio/transcribe",
             json={"event_id": event_id},
             timeout=10,
         )
-        log.info(f"Transcription response: {r.status_code} {r.text}")
+        if not r.ok:
+            log.warning(f"{event_id}: trigger failed {r.status_code} {r.text}")
+            return False
+        if r.json().get("message") == "in_progress":
+            log.debug(f"{event_id}: transcription already running, will retry next poll")
+            return False
     except Exception as e:
-        log.error(f"Failed to call transcription API: {e}")
+        log.error(f"{event_id}: trigger error: {e}")
+        return False
+
+    # Poll until description appears or timeout
+    deadline = time.time() + TRANSCRIBE_TIMEOUT
+    while time.time() < deadline:
+        time.sleep(3)
+        try:
+            r = requests.get(f"{FRIGATE_API}/api/events/{event_id}", timeout=10)
+            desc = r.json().get("data", {}).get("description")
+            if desc:
+                log.info(f"{event_id}: {desc[:80]}")
+                return True
+        except Exception:
+            pass
+
+    log.warning(f"{event_id}: timed out waiting for transcription")
+    return False
 
 
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="frigate-auto-transcribe")
-client.username_pw_set(MQTT_USER, MQTT_PASS)
-client.on_connect = on_connect
-client.on_message = on_message
-client.connect(MQTT_HOST, MQTT_PORT, 60)
-client.loop_forever()
+def main():
+    log.info(f"Starting — polling {FRIGATE_API} every {POLL_INTERVAL}s")
+    # Start from 24h ago to catch any missed recent events
+    poll_after = time.time() - 86400
+
+    while True:
+        events = get_untranscribed_events(poll_after)
+        if events:
+            log.info(f"Found {len(events)} untranscribed speech events")
+            for event in events:
+                transcribe_event(event["id"])
+                time.sleep(1)  # brief pause between API calls
+        # Next poll: look back 10 minutes to catch any that appeared late
+        poll_after = time.time() - 600
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
