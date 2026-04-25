@@ -8,10 +8,24 @@ import requests
 
 FRIGATE_API = os.environ.get("FRIGATE_API_URL", "http://127.0.0.1:5000")
 POLL_INTERVAL = 30  # seconds between polls
-TRANSCRIBE_TIMEOUT = 90  # seconds to wait for transcription to complete
+TRANSCRIBE_TIMEOUT = 120  # seconds to wait for transcription to complete
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("auto-transcribe")
+
+
+def wait_for_api():
+    """Block until Frigate API is ready."""
+    while True:
+        try:
+            r = requests.get(f"{FRIGATE_API}/api/stats", timeout=5)
+            if r.ok:
+                log.info("Frigate API ready")
+                return
+        except Exception:
+            pass
+        log.info("Waiting for Frigate API...")
+        time.sleep(5)
 
 
 def get_untranscribed_events(after: float) -> list[dict]:
@@ -67,6 +81,7 @@ def transcribe_event(event_id: str) -> bool:
 
 def main():
     log.info(f"Starting — polling {FRIGATE_API} every {POLL_INTERVAL}s")
+    wait_for_api()
     # Start from 24h ago to catch any missed recent events
     poll_after = time.time() - 86400
 
