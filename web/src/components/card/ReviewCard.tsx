@@ -85,7 +85,7 @@ export default function ReviewCard({
         { playback: "realtime" },
       )
       .then((response) => {
-        if (response.status == 200) {
+        if (response.status < 300) {
           toast.success(t("export.toast.success"), {
             position: "top-center",
             action: (
@@ -275,7 +275,7 @@ export default function ReviewCard({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <ContextMenu key={event.id} modal={false}>
+        <ContextMenu key={event.id}>
           <ContextMenuTrigger asChild>{content}</ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem>
