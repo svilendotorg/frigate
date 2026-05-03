@@ -1,3 +1,8 @@
+> **🍴 Fork notice** — this is a downstream fork of [blakeblackshear/frigate](https://github.com/blakeblackshear/frigate). Default branch [`feat/whisper-transcription-tuning`](https://github.com/svilendotorg/frigate/tree/feat/whisper-transcription-tuning) tunes the Whisper transcription pipeline for noisy IP-camera audio (`afftdn + loudnorm` + `medium` model + VAD off) and ships systemd deployment scripts.
+> See [**IMPROVEMENTS.md**](IMPROVEMENTS.md) for the full list of downstream changes and rationale.
+
+---
+
 <p align="center">
   <img align="center" alt="logo" src="docs/static/img/branding/frigate.png">
 </p>
